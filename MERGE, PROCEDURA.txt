@@ -1,3 +1,16 @@
+
+CREATE TABLE [dbo].[KLIENT](
+	[ID] [int] NULL,
+	[IMIE] [nvarchar](50) NULL,
+	[ULICA] [nvarchar](50) NULL
+
+CREATE TABLE [dbo].[KLIENT_NEW](
+	[ID] [int] NULL,
+	[IMIE] [nvarchar](50) NULL,
+	[ULICA] [nvarchar](50) NULL
+
+
+
 BEGIN TRANSACTION 
 DECLARE @arch table
 (id int,
