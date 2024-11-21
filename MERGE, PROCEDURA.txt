@@ -1,0 +1,64 @@
+BEGIN TRANSACTION 
+DECLARE @arch table
+(id int,
+imie nvarchar(50),
+ulica nvarchar(50),
+action varchar(10),
+id_old int,
+imie_old nvarchar(50),
+ulica_old nvarchar(50)
+);
+
+MERGE KLIENT AS TARGET
+USING KLIENT_NEW AS SOURCE
+ON TARGET.ID = SOURCE.ID 
+WHEN MATCHED AND TARGET.IMIE <> SOURCE.IMIE OR TARGET.ULICA <> SOURCE.ULICA 
+THEN UPDATE  
+SET TARGET.IMIE = SOURCE.IMIE, 
+TARGET.ULICA = SOURCE.ULICA
+WHEN NOT MATCHED BY TARGET 
+THEN INSERT
+(ID,IMIE,ULICA) VALUES (SOURCE.ID, SOURCE.IMIE, SOURCE.ULICA)
+WHEN NOT MATCHED BY SOURCE 
+THEN DELETE
+OUTPUT 
+inserted.id as id,
+inserted.imie as imie,
+inserted.ulica as ulica,
+$Action AS Action,
+deleted.id as id_old,
+deleted.imie as imie_old,
+deleted.ulica as ulica_old
+
+into @arch ; 
+
+select * from @arch
+
+ROLLBACK;
+ 
+
+
+
+
+
+ --procedura dodawania klienta
+
+CREATE PROCEDURE dodawanie_nowego
+    @imie NVARCHAR(100),
+    @ulica NVARCHAR(200)
+AS
+BEGIN
+   
+    DECLARE @new_id INT;
+    SELECT @new_id = ISNULL(MAX(id), 0) + 1 FROM KLIENT_NEW;
+
+    INSERT INTO KLIENT_NEW (id, imie, ulica)
+    VALUES (@new_id, @imie, @ulica);
+
+    SELECT @new_id AS NewID;
+END;
+
+drop procedure dodawanie_nowego;
+
+
+EXEC dodawanie_nowego @imie = 'ŁUKASZ', @ulica = 'Kośna';

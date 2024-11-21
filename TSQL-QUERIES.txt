@@ -1,0 +1,525 @@
+-----PRZYKŁADOWE DANE Z TABELI: TRAIN
+
+--+--------+------------------+------------+------------+---------------+-------------+--------------------+-----------+---------------+--------------+-----------+-------------+--------+------------------+------------+----------------+-------------------------------------------------------+--------+
+--| Row_ID |    Order_ID      | Order_Date | Ship_Date  |   Ship_Mode    | Customer_ID |   Customer_Name    |  Segment  |    Country    |     City     |   State   | Postal_Code | Region |    Product_ID    |  Category  | Sub_Category   |                   Product_Name                       | Sales  |
+--+--------+------------------+------------+------------+---------------+-------------+--------------------+-----------+---------------+--------------+-----------+-------------+--------+------------------+------------+----------------+-------------------------------------------------------+--------+
+--|   1    | CA-2017-152156   | 2017-11-11 | 2017-11-11 | Second Class   | CG-12520    | Claire Gute        | Consumer  | United States | Henderson    | Kentucky  | 42420       | South  | FUR-BO-10001798  | Furniture  | Bookcases      | Bush Somerset Collection Bookcase                    | 261,96 |
+--|   2    | CA-2017-152156   | 2017-11-11 | 2017-11-11 | Second Class   | CG-12520    | Claire Gute        | Consumer  | United States | Henderson    | Kentucky  | 42420       | South  | FUR-CH-10000454  | Furniture  | Chairs         | Hon Deluxe Fabric Upholstered Stacking Chairs        | 731,94 |
+--|   3    | CA-2017-138688   | 2017-06-16 | 2017-06-16 | Second Class   | DV-13045    | Darrin Van Huff    | Corporate | United States | Los Angeles  | California| 90036       | West   | OFF-LA-10000240  | Office Supp| Labels         | Self-Adhesive Address Labels                         | 14,62  |
+--|   4    |  ...             | ...        | ...        | ...            | ...         | ...                | ...       | ...           | ...          | ...       | ...         | ...    | ...              | ...        | ...            | ...                                                  | ...    |
+--+--------+------------------+------------+------------+----------------+-------------+--------------------+-----------+---------------+--------------+-----------+-------------+--------+------------------+------------+----------------+------------------------------------------------------+--------+
+
+
+---ZAPYTANIA
+
+use shopkaggle
+-- znalezienie najdrozszego produktu z kaazdego zamowienia
+with cte   as (
+	Select 
+		order_id,
+		customer_id,
+		ROW_NUMBER() over (partition by order_id order by sales desc) as rn,
+		Sales,
+		product_name
+	from test
+)
+
+Select 
+	order_id,
+	customer_id,
+	Sales,
+	product_name
+	--ROW_NUMBER() over (partition by order_id order by sales desc) as rn
+from cte
+where rn = 1
+;
+
+--zadanie 1
+
+select 
+	order_id
+from train 
+where region = 'east' and sales > 500;
+
+--zadanie 2
+select 
+	city
+from train
+group by city
+having SUM(Sales)> 1000
+
+--zadanie3 
+select 
+    distinct order_id
+from train
+where Order_Date > '2022-01-01';
+
+
+--zadanie4
+select
+	Customer_ID
+from train
+where sales > 300  and state = 'California'
+
+
+--zadanie5
+select category
+from train
+group by Category
+having sum(sales)<2000
+
+---zadanie6
+select 
+	customer_id
+from train
+where region = 'West' and Sub_Category= 'Chairs'
+
+--zadanie7
+
+select distinct
+	order_id
+from train
+where Sales between 100 and 500
+
+--zadanie8
+select 
+	state
+from train
+group by state 
+having COUNt(DISTINCT Order_ID) > 5
+
+select count(DISTINCT order_id)
+from train
+where state = 'california'
+
+select DISTINCT Order_ID
+from train
+where state = 'california'
+ORDER BY Order_ID
+
+
+
+
+------ Znajdź klientów, którzy dokonali więcej niż 10 zamówień
+
+SELECT
+	CUSTOMER_ID,
+	CUSTOMER_NAME
+FROM TRAIN
+GROUP BY Customer_ID,Customer_Name
+HAVING COUNT(DISTINCT ORDER_ID) > 10;
+
+---- Wyznacz najlepiej sprzedający się produkt w każdym regionie
+
+WITH PRODUCTSALES AS (
+SELECT 
+	REGION,
+	PRODUCT_NAME,
+	SUM(SALES) AS TOTAL_SALES
+FROM TRAIN
+GROUP BY REGION, PRODUCT_NAME
+	),
+BESTSELLINGPRODUCTS AS (
+	SELECT
+		REGION,
+		PRODUCT_NAME,
+		TOTAL_SALES,
+		RANK() OVER (PARTITION BY REGION ORDER BY TOTAL_SALES DESC) AS RNK
+	FROM PRODUCTSALES
+)
+
+SELECT
+	REGION,
+	PRODUCT_NAME,
+	TOTAL_SALES
+FROM BESTSELLINGPRODUCTS
+WHERE RNK = 1
+
+
+--- Zidentyfikuj produkty, które były sprzedawane w każdym regionie
+
+
+SELECT Product_ID, Product_Name
+FROM train
+GROUP BY Product_ID, Product_Name
+HAVING COUNT(DISTINCT Region) = (SELECT COUNT(DISTINCT Region) FROM train);
+
+
+-------- Wyświetl 5 produktów o największej liczbie zamówień
+
+with total_count as (
+	select
+		Product_ID,
+		count(order_id) as total
+	from train
+	group by Product_ID
+),
+ranking as (
+	select 
+		product_id,
+		total,
+		rank() over (order by total desc) as rnk
+	from total_count
+)
+
+select 
+	product_id,
+	total
+from ranking
+where rnk <=5
+
+---- Znajdź klientów, którzy złożyli zamówienia w więcej niż jednym regionie
+
+select 
+	customer_id
+from train 
+group by Customer_ID
+having COUNT(distinct Region) > 1
+
+
+-----Oblicz liczbę zamówień zrealizowanych w każdym roku
+
+select 
+	YEAR(order_Date) as year,
+	count(distinct order_id)
+from train
+group by year(Order_Date)
+order by year;
+
+
+
+-------------Znajdź różnicę w całkowitej sprzedaży pomiędzy najlepszym a najgorszym segmentem
+
+with segment_sales as (
+select
+	segment,
+	sum(sales) as sum_of_sales
+from train
+group by Segment
+)
+select 
+	MAX(sum_of_sales) - min(sum_of_sales)
+from segment_sales
+
+
+
+----------- Znajdź produkty sprzedawane w więcej niż 10 miastach
+
+select 
+	product_id,
+	Product_Name,
+	count(distinct city) as city_count
+from train
+group by product_id, Product_Name
+having count(distinct city) > 10
+order by product_id
+
+
+-----  Zidentyfikuj regiony, w których liczba zamówień przekracza średnią liczbę zamówień w innych regionach
+
+
+WITH Avg_Orders AS (
+    SELECT AVG(Order_Count) AS Avg_Order_Count
+    FROM (
+        SELECT region, COUNT(distinct Order_ID) AS Order_Count
+        FROM train
+		GROUP BY Region
+    ) AS subquery
+)
+SELECT Region, COUNT(DISTINCT Order_ID) AS Order_Count
+FROM train
+GROUP BY Region
+HAVING COUNT(DISTINCT Order_ID) > (SELECT Avg_Order_Count FROM Avg_Orders);
+
+
+
+------- Znajdź miasta, w których całkowita sprzedaż dla kategorii 'Technology' przekroczyła 10,000
+
+select
+	city,
+	SUM(sales) as total_sales
+from train
+where Category = 'Technology'
+group by city
+having sum(Sales) > 10000
+
+
+
+-------- Utwórz ranking miast na podstawie sprzedaży w kategorii 'Furniture'
+
+
+select 
+	city,
+	sum(sales) as total_sales
+	,rank() over (order by sum(sales) desc) as ranking
+from train
+where Category = 'Furniture'
+group by city
+order by sum(sales) desc
+
+
+
+---------------- Znajdź zamówienia, które miały najdłuzszy czas dostawy w danym stanie
+
+--kazdy rekord order_date = ship_date
+begin transaction
+update train
+set ship_Date = '2016-06-06'
+where ship_Date = '2016-06-02'
+rollback;
+
+
+select
+	state,
+	MAX(days_to_shipped) as days_to_shipped
+from (
+	SELECT
+		distinct order_id,
+		state,
+		order_date,
+		ship_Date,
+		DATEDIFF(day,order_Date,Ship_Date) as days_to_shipped
+	FROM train 
+	) as days_to_each_order
+group by state
+
+
+--------- Oblicz skumulowaną sprzedaż dla każdego regionu w czasie
+
+select 
+	region,
+	order_date,
+	order_id,
+	sales,
+	SUM(sales) over (partition by region order by order_date) as sumik
+FROM train
+order by Region, order_Date
+
+
+---- Znajdź klientów, którzy dokonali największej sprzedaży w regionie 'West'
+
+ 
+WITH TOTAL_SALES_BY_CUSTOMERS AS (
+	SELECT 
+		CUSTOMER_ID,
+		REGION,
+		SUM(SALES) AS TOTAL_SALES
+	FROM train
+	WHERE REGION = 'West'
+	GROUP BY Customer_ID,REGION	
+	) 
+
+	SELECT 
+		CUSTOMER_ID,
+		REGION,
+		MAX(TOTAL_SALES) AS TOTAL_SALES
+	FROM TOTAL_SALES_BY_CUSTOMERS
+	WHERE TOTAL_SALES = (SELECT MAX(TOTAL_SALES) FROM TOTAL_SALES_BY_CUSTOMERS)
+	GROUP BY Customer_ID,REGION;
+
+--
+		SELECT TOP 1
+		CUSTOMER_ID,
+		REGION,
+		SUM(SALES) AS TOTAL_SALES
+	FROM train
+	WHERE REGION = 'West'
+	GROUP BY Customer_ID,REGION	
+	ORDER BY TOTAL_SALES DESC
+
+---wykorzystanie RANK()
+
+with TOTAL_SALES_BY_CUSTOMERS as (
+	SELECT
+		distinct customer_id,
+		sum(sales) as total_sales
+	from train
+	where region = 'West'
+	group by Customer_ID
+	),
+	sales_ranking as (
+	select 
+		customer_id,
+		total_sales,
+		rank() over (order by total_sales desc) as ranking
+	from TOTAL_SALES_BY_CUSTOMERS
+	)
+
+select	
+	distinct customer_id,
+	total_sales
+from sales_ranking
+where ranking = 1
+
+
+-- Znajdź zamówienia, których sprzedaż (Sales) jest większa niż średnia sprzedaż w całej tabeli.
+
+SELECT Order_ID
+FROM train
+WHERE SALES > (SELECT AVG(SALES)
+				FROM TRAIN
+				)
+			GROUP BY ORDER_ID;
+
+-- Znajdź klientów, którzy dokonali sprzedaży większej niż średnia w ich własnym regionie.
+
+select 
+	customer_id,
+	sum(sales) AS TOTAL_sALES,
+	REGION
+FROM train T
+GROUP BY Customer_ID, REGION
+HAVING SUM(Sales) >  (select avg(t1.sales)
+							from train t1
+							where t.Region = t1.Region);
+
+						
+
+---- Znajdź produkt o najwyższej sprzedaży w każdym regionie.
+with sales_by_region as (
+SELECT
+	REGION,
+	PRODUCT_ID,
+	SUM(SALES) as total_sales
+FROM TRAIN
+GROUP BY REGION, PRODUCT_ID
+),
+
+list_of as (
+select
+	region,
+	Product_ID,
+	total_sales,
+	ROW_NUMBER() over (partition by region order by total_Sales desc) as rn
+from sales_by_region
+group by region,Product_ID,total_sales
+)
+
+select 
+	region,
+	Product_ID,
+	total_sales
+from list_of 
+where rn = 1
+
+
+Select DATEFROMPARTS(2099,5,4)
+select cast(Order_Date as datetime)
+from train
+
+select EOMONTH(DATEFROMPARTS(2099,5,4))
+
+
+SELECT * FROM TRAIN
+
+
+
+--- ANALIZA KOHORTOWA DLA ROKU 2015
+;with Data_2015 as
+(
+	SELECT 
+		[order_ID],
+		[order_Date],
+		[customer_id],
+		[product_id],
+		[sales]
+	from test
+	where year(Order_Date) = '2015'
+		)
+
+select * 
+into #data2015 
+from Data_2015
+;
+
+--sprawdzenie ile jest customerow jest wicej niz 1 raz
+select customer_id
+from #data2015
+group by Customer_ID
+having COUNT(Customer_ID)> 1
+
+select * from #data2015;
+--zrobienie cohorty
+select
+	customer_ID,
+	min(order_date) first_purchase_date,
+	EOMONTH(min(order_date)) as cohort_date
+INTO #cohort
+from #data2015
+group by Customer_ID;
+
+
+--create cohort index
+select
+	ddd.*,
+	cohort_index = year_diff * 12 + month_diff + 1	 
+	--cohort_index = ROUND(DATEDIFF(DAY, first_purchase_date, Order_Date) / 30.0, 0)
+into #cohort_retention
+from
+	(
+		select
+			dd.*,
+			year_diff = order_year - cohort_year,
+			month_diff = order_month - cohort_month
+		from
+				(
+					select 
+						d.*,
+						c.cohort_date,
+						YEAR(d.order_date) order_year,
+						MONTH(d.order_DAte) order_month,
+						YEAR(c.cohort_date) cohort_year,
+						MONTH(c.cohort_DAte) cohort_month,
+						first_purchase_date
+					from #data2015 d
+					left join #cohort c
+						on d.Customer_ID = c.Customer_ID
+				)dd
+	)ddd
+
+--drop table #cohort_retention	
+
+
+select * from #cohort_retention;
+
+--pivot table
+
+select *
+INTO #cohort_pivot
+from (
+	select  distinct Customer_ID,
+			cohort_date,
+			cohort_index
+	from #cohort_retention
+)tbl
+pivot(
+	count(Customer_ID) for cohort_index IN 
+		(
+	--	[0],
+		[1],
+		[2],
+		[3],
+		[4],
+		[5],
+		[6],
+		[7],
+		[8],
+		[9],
+		[10],
+		[11],
+		[12]
+		)
+)AS PIVOT_TABLE
+
+--drop table #cohort_pivot
+
+select distinct cohort_index 
+from #cohort_retention
+order by cohort_index
+
+select * 
+from #cohort_pivot
+ORDER BY cohort_date
+
+
+
